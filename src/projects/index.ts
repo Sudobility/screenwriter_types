@@ -33,6 +33,7 @@ export interface ProjectSummary {
   coverAssetId: string | null;
   kind: ProjectKind;
   logline: string | null;
+  visualStyleId: string | null;
   documentCount: number;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +104,8 @@ export const projectUpdateSchema = z.object({
   kind: projectKindSchema.optional(),
   logline: z.string().max(2000).nullable().optional(),
   entityId: z.string().optional(),
+  visualStyleId: z.string().nullable().optional(),
+  confirmDeleteGeneratedImages: z.boolean().optional(),
 });
 export type ProjectUpdateRequest = z.infer<typeof projectUpdateSchema>;
 

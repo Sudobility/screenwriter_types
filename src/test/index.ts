@@ -33,6 +33,7 @@ export function makeProject(over: Partial<Project> = {}): Project {
     coverAssetId: null,
     kind: 'feature',
     logline: null,
+    visualStyleId: null,
     documentCount: 0,
     createdAt: T,
     updatedAt: T,
