@@ -1461,6 +1461,7 @@ describe('B16 imports, exports and watermark', () => {
       'import.fountain',
       'import.fdx',
       'import.fadein',
+      'import.txt',
       'import.ocr',
       'export.fountain',
       'export.fdx',
@@ -1470,7 +1471,7 @@ describe('B16 imports, exports and watermark', () => {
     ]) {
       expect(JOB_KINDS as readonly string[]).toContain(k);
     }
-    expect(JOB_IMPORT_FORMATS).toEqual(['fountain', 'fdx', 'fadein']);
+    expect(JOB_IMPORT_FORMATS).toEqual(['fountain', 'fdx', 'fadein', 'txt']);
     expect(JOB_EXPORT_FORMATS).toEqual(['fountain', 'fdx', 'json']);
     expect(COMBINED_EXPORT_FORMATS).toEqual(['fdx', 'fountain']);
     expect(ERROR_STATUS.IMPORT_FORMAT_UNSUPPORTED).toBe(415);

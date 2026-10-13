@@ -53,6 +53,7 @@ export const JOB_KINDS = [
   'import.fdx',
   'import.fountain',
   'import.fadein',
+  'import.txt',
   'import.pdf',
   'import.ocr',
   'import.celtx',

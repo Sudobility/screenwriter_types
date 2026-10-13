@@ -13,8 +13,8 @@ import type { ConversionReport } from '../formats/index.js';
  * `OCR_UNAVAILABLE`; nothing fakes them.
  */
 
-/** Formats `POST /imports` accepts (a job kind `import.<format>` exists for each). */
-export const JOB_IMPORT_FORMATS = ['fountain', 'fdx', 'fadein'] as const;
+/** Formats `POST /imports` accepts (a job kind `import.<format>` exists for each). `txt` is smart plain-text import. */
+export const JOB_IMPORT_FORMATS = ['fountain', 'fdx', 'fadein', 'txt'] as const;
 export type JobImportFormat = (typeof JOB_IMPORT_FORMATS)[number];
 /** Formats an export job produces (`export.<format>`). */
 export const JOB_EXPORT_FORMATS = ['fountain', 'fdx', 'json'] as const;
