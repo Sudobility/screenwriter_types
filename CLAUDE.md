@@ -30,14 +30,18 @@ TypeScript, Zod v4, Vitest, Bun. Depends on `@sudobility/writing_core` for ids, 
 
 ```bash
 bun install
-bunx tsc --noEmit      # typecheck
-bunx vitest run        # smoke tests (never `bun test`)
-bun run lint
+bun run typecheck      # tsc --noEmit
+bun run test:unit      # vitest run (never `bun test`; test:watch to watch)
+bun run lint           # eslint src
+bun run build          # vite build + tsc -p tsconfig.build.json -> dist/
+bun run format         # prettier --write
 ```
 
-## Local-path rule (no publishing)
+## Publishing & writing_core resolution
 
-`@sudobility/writing_core` resolves by path to the sibling repo: `tsconfig.json` `paths` and a `vitest.config.ts` alias both point at `../writing_core/src/index.ts`. Do not publish or bump versions. `bun run build` does not work in this mode (writing_core sits outside `rootDir`); downstream repos import `src` directly by path.
+Published to **GitHub Packages** (`@sudobility` scope via `.npmrc` -> `npm.pkg.github.com`); `.github/workflows/ci-cd.yml` publishes on push to `main` (reusable `johnqh/workflows` unified-cicd, `publish-target: github`). Install needs a token with `read:packages`.
+
+`@sudobility/writing_core` is a **real npm dependency** (`^0.1.6`). For local cross-repo dev, `tsconfig.json` `paths` and `vitest.config.ts` alias it to `../writing_core/src/index.ts` **only when that sibling is checked out** (vitest guards with `existsSync`); otherwise it falls back to node_modules. `bun run build` works and resolves writing_core from node_modules — `tsconfig.build.json` deliberately clears `paths` so declaration output doesn't pull in writing_core's raw source graph.
 
 ## Notes
 
