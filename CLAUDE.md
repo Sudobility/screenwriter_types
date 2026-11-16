@@ -8,7 +8,7 @@ TypeScript, Zod v4, Vitest, Bun. Depends on `@sudobility/writing_core` for ids, 
 
 ## Structure
 
-- `src/api/` envelope (`successResponse`, `errorResponse`, `API_ERROR_CODES`, `ERROR_STATUS`, `Paginated`), `cursorQuerySchema`, `API_ROUTES`
+- `src/api/` envelope (canonical `@sudobility/types` `BaseResponse`/`ApiResponse` + re-exported `successResponse`, `errorResponse`, `isSuccessResponse`, `isErrorResponse`; list responses use the shared `PaginatedResponse`/`PaginationInfo` — the old bespoke `Paginated<T>` is gone), error-codes (`API_ERROR_CODES`, `ERROR_STATUS`, `ApiErrorCode` — internal API vocabulary/status map, not on the wire), `cursorQuerySchema`, `API_ROUTES`
 - `src/ids/` re-exports from writing_core
 - `src/tenancy/`, `projects/`, `me/`, `templates/`, `versions/`, `commands/` DTOs and request schemas. `tenancy/` also holds the role/permission matrix (`PERMISSION_MIN_ROLE`, `ROLE_PERMISSIONS`, `hasPermission`, `roleAtLeast`, `maxRole`, `minRole`, `requiredRoleFor`; spec 05 §5.2)
 - `src/sharing/` (B8) workspace/member/invitation/grant/share-link/lock DTOs and Zod request schemas (spec 05 §5.4, §6.2-6.4, §8.3)
@@ -45,7 +45,7 @@ Published to **GitHub Packages** (`@sudobility` scope via `.npmrc` -> `npm.pkg.g
 
 ## Notes
 
-- Envelope is `{success, data}` or `{success:false, error, code, details?}`, with no timestamp (no clock in this package).
+- Envelope is the canonical `@sudobility/types` `BaseResponse<T>`: `{success, data?, error?, timestamp}`. `successResponse`/`errorResponse`/guards are re-exported from `@sudobility/types` (it reads the clock for `timestamp`). The error body carries no `code`/`details`; the `ApiErrorCode`/`ERROR_STATUS` vocabulary (`src/api/error-codes.ts`) is internal to the API (picks the HTTP status, disambiguates same-status errors).
 - `ping` and `pong` share message code 4.
 - Spec source: screenwriter_plans specs 05 (§1.1, §6, §10, §12) and 03 (§2).
 

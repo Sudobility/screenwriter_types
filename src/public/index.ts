@@ -40,7 +40,8 @@ export interface NamesDbResponse {
   names: NamesDbEntry[];
 }
 
-/** `GET /public/health/deep`: readiness, no secrets. */
+/** Readiness checks (no secrets) carried in the standard `/health` response's `detail` map.
+ *  Formerly the body of the removed bespoke `/public/health/deep` route. */
 export interface DeepHealthResponse {
   db: 'ok' | 'error';
   storage: 'ok' | 'unconfigured' | 'error';

@@ -172,17 +172,15 @@ import {
 describe('envelope', () => {
   it('round-trips through JSON', () => {
     const ok = successResponse({ a: 1 });
-    expect(JSON.parse(JSON.stringify(ok))).toEqual({
-      success: true,
-      data: { a: 1 },
-    });
-    const err = errorResponse('nope', API_ERROR_CODES.NOT_FOUND, { x: 1 });
-    expect(JSON.parse(JSON.stringify(err))).toEqual({
-      success: false,
-      error: 'nope',
-      code: 'NOT_FOUND',
-      details: { x: 1 },
-    });
+    const okJson = JSON.parse(JSON.stringify(ok));
+    expect(okJson.success).toBe(true);
+    expect(okJson.data).toEqual({ a: 1 });
+    expect(typeof okJson.timestamp).toBe('string');
+    const err = errorResponse('nope');
+    const errJson = JSON.parse(JSON.stringify(err));
+    expect(errJson.success).toBe(false);
+    expect(errJson.error).toBe('nope');
+    expect(typeof errJson.timestamp).toBe('string');
   });
   it('has a non-empty code vocabulary with statuses', () => {
     const codes = Object.keys(API_ERROR_CODES);

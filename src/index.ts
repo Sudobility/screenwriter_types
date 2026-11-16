@@ -4,6 +4,7 @@
  * Import from the package root only.
  */
 export * from './api/envelope.js';
+export * from './api/error-codes.js';
 export * from './api/pagination.js';
 export * from './api/routes.js';
 export * from './ids/index.js';
