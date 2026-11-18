@@ -454,31 +454,37 @@ describe('roles and permissions (spec 05 §5.2)', () => {
     }
   });
   it('matches the spec table on the rows that matter', () => {
-    expect(hasPermission('viewer', 'document.read')).toBe(true);
-    expect(hasPermission('viewer', 'document.edit')).toBe(false);
-    expect(hasPermission('viewer', 'document.comment')).toBe(false);
-    expect(hasPermission('commenter', 'document.comment')).toBe(true);
-    expect(hasPermission('commenter', 'ai.review')).toBe(true);
-    expect(hasPermission('commenter', 'ai.run')).toBe(false);
-    expect(hasPermission('commenter', 'document.edit')).toBe(false);
-    expect(hasPermission('writer', 'document.edit')).toBe(true);
-    expect(hasPermission('writer', 'share.manage')).toBe(true);
-    expect(hasPermission('writer', 'members.invite')).toBe(false);
-    expect(hasPermission('writer', 'project.purge')).toBe(false);
-    expect(hasPermission('admin', 'members.invite')).toBe(true);
-    expect(hasPermission('admin', 'entity.audit')).toBe(true);
-    expect(hasPermission('admin', 'entity.aiToggle')).toBe(false);
-    expect(hasPermission('admin', 'entity.delete')).toBe(false);
+    // Unified owner/manager/member model (collapsed from the 5-role ladder):
+    // member = read, manager = edit/manage, owner = also aiToggle/delete/transfer.
+    expect(hasPermission('member', 'document.read')).toBe(true);
+    expect(hasPermission('member', 'document.edit')).toBe(false);
+    expect(hasPermission('member', 'document.comment')).toBe(true);
+    expect(hasPermission('member', 'ai.review')).toBe(true);
+    expect(hasPermission('member', 'ai.run')).toBe(false);
+    expect(hasPermission('member', 'share.manage')).toBe(false);
+    expect(hasPermission('member', 'members.invite')).toBe(false);
+    expect(hasPermission('member', 'project.purge')).toBe(false);
+    expect(hasPermission('manager', 'document.edit')).toBe(true);
+    expect(hasPermission('manager', 'share.manage')).toBe(true);
+    expect(hasPermission('manager', 'ai.run')).toBe(true);
+    expect(hasPermission('manager', 'members.invite')).toBe(true);
+    expect(hasPermission('manager', 'project.purge')).toBe(true);
+    expect(hasPermission('manager', 'entity.audit')).toBe(true);
+    expect(hasPermission('manager', 'entity.aiToggle')).toBe(false);
+    expect(hasPermission('manager', 'entity.delete')).toBe(false);
+    expect(hasPermission('manager', 'entity.transfer')).toBe(false);
+    expect(hasPermission('owner', 'entity.aiToggle')).toBe(true);
+    expect(hasPermission('owner', 'entity.delete')).toBe(true);
     expect(hasPermission('owner', 'entity.transfer')).toBe(true);
-    expect(requiredRoleFor('document.edit')).toBe('writer');
+    expect(requiredRoleFor('document.edit')).toBe('manager');
     expect(requiredRoleFor('entity.aiToggle')).toBe('owner');
   });
   it('orders roles', () => {
-    expect(roleAtLeast('admin', 'writer')).toBe(true);
-    expect(roleAtLeast('viewer', 'commenter')).toBe(false);
-    expect(maxRole('viewer', null, 'writer')).toBe('writer');
+    expect(roleAtLeast('manager', 'member')).toBe(true);
+    expect(roleAtLeast('member', 'manager')).toBe(false);
+    expect(maxRole('member', null, 'manager')).toBe('manager');
     expect(maxRole(null, undefined)).toBeNull();
-    expect(minRole('owner', 'writer')).toBe('writer');
+    expect(minRole('owner', 'manager')).toBe('manager');
   });
   it('every permission named by a route exists in the matrix', () => {
     const known = new Set<string>(PERMISSIONS);
@@ -550,11 +556,11 @@ describe('B8 routes and schemas', () => {
     );
     expect(entityTransferSchema.safeParse({}).success).toBe(false);
     expect(
-      invitationCreateSchema.safeParse({ email: 'a@b.co', role: 'viewer' })
+      invitationCreateSchema.safeParse({ email: 'a@b.co', role: 'member' })
         .success
     ).toBe(true);
     expect(
-      invitationCreateSchema.safeParse({ email: 'nope', role: 'viewer' })
+      invitationCreateSchema.safeParse({ email: 'nope', role: 'member' })
         .success
     ).toBe(false);
     expect(
@@ -589,17 +595,19 @@ describe('B8 routes and schemas', () => {
     expect(shareUnlockSchema.safeParse({}).success).toBe(true);
   });
   it('projects roles onto the sync write matrix', () => {
-    expect(markPermissionsFor('writer')).toEqual({
+    // Collapsed model: owner/manager edit (and so may comment/highlight);
+    // member and none are read-only (no comment-only / view-only tiers).
+    expect(markPermissionsFor('owner')).toEqual({
       edit: true,
       comment: true,
       highlight: true,
     });
-    expect(markPermissionsFor('commenter')).toEqual({
-      edit: false,
+    expect(markPermissionsFor('manager')).toEqual({
+      edit: true,
       comment: true,
       highlight: true,
     });
-    expect(markPermissionsFor('viewer')).toEqual({
+    expect(markPermissionsFor('member')).toEqual({
       edit: false,
       comment: false,
       highlight: false,
@@ -1371,11 +1379,11 @@ describe('B14 lifecycle and workspace settings', () => {
     expect(
       workspaceDefaultsPutSchema.safeParse({
         baseUpdatedAt: '2026-01-01T00:00:00Z',
-        defaultProjectRole: 'writer',
+        defaultProjectRole: 'manager',
       }).success
     ).toBe(true);
     expect(
-      workspaceDefaultsPutSchema.safeParse({ defaultProjectRole: 'writer' })
+      workspaceDefaultsPutSchema.safeParse({ defaultProjectRole: 'manager' })
         .success
     ).toBe(false);
     expect(

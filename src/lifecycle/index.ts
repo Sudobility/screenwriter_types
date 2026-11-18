@@ -196,12 +196,7 @@ export interface ProjectBinDeleteResponse {
 
 // ─── workspace defaults (§6.26) ───────────────────────────────────────────────
 
-export const DEFAULT_PROJECT_ROLES = [
-  'admin',
-  'writer',
-  'commenter',
-  'viewer',
-] as const;
+export const DEFAULT_PROJECT_ROLES = ['manager', 'member'] as const;
 export type DefaultProjectRole = (typeof DEFAULT_PROJECT_ROLES)[number];
 
 const looseItems = (max: number) => z.array(z.looseObject({})).max(max);

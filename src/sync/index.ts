@@ -85,14 +85,7 @@ export const SYNC_EPOCH_REASONS = [
   'schema-migration',
 ] as const;
 
-const roleOrNone = z.enum([
-  'owner',
-  'admin',
-  'writer',
-  'commenter',
-  'viewer',
-  'none',
-]);
+const roleOrNone = z.enum(['owner', 'manager', 'member', 'none']);
 const bytes = z.instanceof(Uint8Array);
 const uint = z.number().int().min(0);
 

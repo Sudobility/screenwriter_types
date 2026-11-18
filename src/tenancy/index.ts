@@ -1,16 +1,15 @@
 import { z } from 'zod';
 
-export const ENTITY_KINDS = ['personal', 'team'] as const;
+export const ENTITY_KINDS = ['personal', 'organization'] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
-/** Ordered by authority (spec 05 §5.2). */
-export const ROLES = [
-  'owner',
-  'admin',
-  'writer',
-  'commenter',
-  'viewer',
-] as const;
+/**
+ * Entity roles, ordered by authority — unified with `@sudobility/entity_service`
+ * (owner/manager/member). Collapsed from the former 5-role ladder: admin+writer
+ * → manager (edit/manage), commenter+viewer → member (read). There is no longer
+ * a comment-only or view-only tier.
+ */
+export const ROLES = ['owner', 'manager', 'member'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const entityKindSchema = z.enum(ENTITY_KINDS);
@@ -53,67 +52,65 @@ export type ManagedEntityDetail = ManagedEntity & {
  *  - `project.trash` / `project.restore` for a writer only applies to projects they created.
  */
 export const PERMISSION_MIN_ROLE = {
-  'entity.read': 'viewer',
-  'entity.update': 'admin',
+  'entity.read': 'member',
+  'entity.update': 'manager',
   'entity.aiToggle': 'owner',
-  'entity.audit': 'admin',
+  'entity.audit': 'manager',
   'entity.delete': 'owner',
   'entity.transfer': 'owner',
-  'entity.leave': 'viewer',
-  'members.read': 'viewer',
-  'members.invite': 'admin',
-  'members.updateRole': 'admin',
-  'members.remove': 'admin',
-  'project.create': 'writer',
-  'project.read': 'viewer',
-  'project.update': 'writer',
-  'project.trash': 'writer',
-  'project.restore': 'writer',
-  'project.purge': 'admin',
-  'document.create': 'writer',
-  'document.read': 'viewer',
-  'document.export': 'viewer',
-  'document.edit': 'writer',
-  'document.comment': 'commenter',
-  'document.chat': 'commenter',
-  'document.activity': 'viewer',
-  'document.trash': 'writer',
-  'document.restore': 'writer',
-  'document.move': 'writer',
-  'document.lock': 'writer',
-  'document.aiExclude': 'writer',
-  'snapshot.create': 'writer',
-  'snapshot.open': 'writer',
-  'snapshot.fork': 'writer',
-  'snapshot.cherryPick': 'writer',
-  'snapshot.appendNote': 'writer',
-  'snapshot.read': 'viewer',
-  'snapshot.compare': 'viewer',
-  'snapshot.hideForSelf': 'viewer',
-  'version.restore': 'writer',
-  'version.restoreAsCopy': 'writer',
-  'share.manage': 'writer',
-  'assets.upload': 'writer',
-  'assets.link': 'writer',
-  'assets.read': 'viewer',
-  'ai.run': 'writer',
-  'ai.review': 'commenter',
-  'jobs.media': 'writer',
-  'templates.manage': 'writer',
-  'reports.run': 'viewer',
-  'apiKeys.use': 'viewer',
+  'entity.leave': 'member',
+  'members.read': 'member',
+  'members.invite': 'manager',
+  'members.updateRole': 'manager',
+  'members.remove': 'manager',
+  'project.create': 'manager',
+  'project.read': 'member',
+  'project.update': 'manager',
+  'project.trash': 'manager',
+  'project.restore': 'manager',
+  'project.purge': 'manager',
+  'document.create': 'manager',
+  'document.read': 'member',
+  'document.export': 'member',
+  'document.edit': 'manager',
+  'document.comment': 'member',
+  'document.chat': 'member',
+  'document.activity': 'member',
+  'document.trash': 'manager',
+  'document.restore': 'manager',
+  'document.move': 'manager',
+  'document.lock': 'manager',
+  'document.aiExclude': 'manager',
+  'snapshot.create': 'manager',
+  'snapshot.open': 'manager',
+  'snapshot.fork': 'manager',
+  'snapshot.cherryPick': 'manager',
+  'snapshot.appendNote': 'manager',
+  'snapshot.read': 'member',
+  'snapshot.compare': 'member',
+  'snapshot.hideForSelf': 'member',
+  'version.restore': 'manager',
+  'version.restoreAsCopy': 'manager',
+  'share.manage': 'manager',
+  'assets.upload': 'manager',
+  'assets.link': 'manager',
+  'assets.read': 'member',
+  'ai.run': 'manager',
+  'ai.review': 'member',
+  'jobs.media': 'manager',
+  'templates.manage': 'manager',
+  'reports.run': 'member',
+  'apiKeys.use': 'member',
 } as const satisfies Record<string, Role>;
 
 export type Permission = keyof typeof PERMISSION_MIN_ROLE;
 export const PERMISSIONS = Object.keys(PERMISSION_MIN_ROLE) as Permission[];
 
-/** 0 = owner ... 4 = viewer; a smaller number is more authority. */
+/** 0 = owner, 1 = manager, 2 = member; a smaller number is more authority. */
 const RANK: Record<Role, number> = {
   owner: 0,
-  admin: 1,
-  writer: 2,
-  commenter: 3,
-  viewer: 4,
+  manager: 1,
+  member: 2,
 };
 
 /** True when `a` has at least the authority of `b`. */
@@ -147,5 +144,5 @@ export const requiredRoleFor = (permission: Permission): Role =>
   PERMISSION_MIN_ROLE[permission];
 
 /** Roles a share grant or a project/document invitation may carry: `owner` is never granted by share. */
-export const SHARE_ROLES = ['admin', 'writer', 'commenter', 'viewer'] as const;
+export const SHARE_ROLES = ['manager', 'member'] as const;
 export type ShareRole = (typeof SHARE_ROLES)[number];

@@ -23,10 +23,11 @@ export interface MarkPermissions {
 }
 
 export function markPermissionsFor(role: Role | 'none'): MarkPermissions {
-  const edit = role === 'owner' || role === 'admin' || role === 'writer';
-  const comment = edit || role === 'commenter';
-  return { edit, comment, highlight: comment };
+  // Unified owner/manager/member model: managers and owners edit; members are
+  // read-only (the former comment-only / view-only tiers were collapsed away).
+  const edit = role === 'owner' || role === 'manager';
+  return { edit, comment: edit, highlight: edit };
 }
 
-/** Roles that may send `update` frames at all (a commenter's are filtered by the matrix). */
-export const canSendUpdates = (role: Role): boolean => role !== 'viewer';
+/** Roles that may send `update` frames at all (members are read-only). */
+export const canSendUpdates = (role: Role): boolean => role !== 'member';
