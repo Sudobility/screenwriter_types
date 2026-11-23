@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import {
-  AI_ENDPOINTS,
   AI_ENDPOINT_OUTPUT_SCHEMAS,
   AI_LIMITS,
   AI_TASKS,
@@ -36,11 +35,14 @@ describe('ai types', () => {
     expect(
       suggestionAcceptSchema.safeParse({ suggestionIds: [] }).success
     ).toBe(false);
-    expect(AI_TASKS).toEqual(['coverage', 'polish.dialogue']);
+    expect(AI_TASKS).toEqual(['coverage', 'polish.dialogue', 'review', 'trim']);
   });
 
   it('every endpoint has an output schema that converts to a closed JSON Schema', () => {
-    for (const e of AI_ENDPOINTS) {
+    // Covers the fixed endpoints plus every per-kind `script-review-*` endpoint.
+    for (const e of Object.keys(
+      AI_ENDPOINT_OUTPUT_SCHEMAS
+    ) as (keyof typeof AI_ENDPOINT_OUTPUT_SCHEMAS)[]) {
       const js = z.toJSONSchema(AI_ENDPOINT_OUTPUT_SCHEMAS[e]) as {
         type: string;
         additionalProperties?: boolean;
@@ -58,6 +60,7 @@ describe('ai types', () => {
       severity: 'praise',
       title: 't',
       body: 'b',
+      suggestion: null,
       anchors: [{ sceneId: 'el_a', elementId: null }],
     };
     const ok = {

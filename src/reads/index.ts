@@ -169,10 +169,37 @@ export interface TagRow {
   sceneId: string | null;
 }
 
+/**
+ * Structured-comment lifecycle + author-source, mirrored from writing_core's `NOTE_STATUSES`/
+ * `NOTE_SOURCES` (duplicated here, not imported, so this DTO layer typechecks standalone against the
+ * published writing_core). Keep the values in lockstep with writing_core.
+ */
+export const NOTE_COMMENT_STATUSES = [
+  'pending',
+  'todo',
+  'rejected',
+  'completed',
+] as const;
+export type NoteCommentStatus = (typeof NOTE_COMMENT_STATUSES)[number];
+export const NOTE_COMMENT_SOURCES = ['writer', 'member', 'ai'] as const;
+export type NoteCommentSource = (typeof NOTE_COMMENT_SOURCES)[number];
+export const NOTE_COMMENT_SEVERITIES = [
+  'praise',
+  'minor',
+  'moderate',
+  'major',
+] as const;
+export type NoteCommentSeverity = (typeof NOTE_COMMENT_SEVERITIES)[number];
+
 export const notesQuerySchema = z.object({
   sceneId: z.string().optional(),
   type: z.string().optional(),
-  status: z.enum(['open', 'resolved']).optional(),
+  status: z.enum(NOTE_COMMENT_STATUSES).optional(),
+  /** Comment author-source filter (distinct from `source`, which is the version SourceRef). */
+  origin: z.enum(NOTE_COMMENT_SOURCES).optional(),
+  category: z.string().optional(),
+  /** Convenience: only active comments (pending/todo). */
+  visible: z.coerce.boolean().optional(),
   source: sourceParamSchema.optional(),
 });
 export interface NoteSummary {
@@ -184,11 +211,19 @@ export interface NoteSummary {
   typeId: string | null;
   color: string | null;
   title: string;
+  /** The comment text (explanation). */
   body: string;
+  /** The concrete suggested action; null when none. */
+  suggestion: string | null;
+  /** The comment "type": a `REVIEW_CATEGORIES` value (free string for forward-compat). */
+  category: string;
+  /** Who authored the comment. */
+  commentSource: NoteCommentSource;
+  severity: NoteCommentSeverity | null;
   author: string | null;
   createdAt: number | null;
   replies: { id: string; author: string; body: string; at: number }[];
-  status: 'open' | 'resolved';
+  status: NoteCommentStatus;
   contentHash: string;
 }
 

@@ -23,11 +23,15 @@ export interface MarkPermissions {
 }
 
 export function markPermissionsFor(role: Role | 'none'): MarkPermissions {
-  // Unified owner/manager/member model: managers and owners edit; members are
-  // read-only (the former comment-only / view-only tiers were collapsed away).
+  // Owner/manager/member model: managers and owners edit everything. Members are comment-only — they
+  // may add/resolve-free notes and comment marks (`notes` + `n:`/`hl`) but not edit the script. This
+  // revives the old commenter write-path so org members can comment on the LIVE document.
   const edit = role === 'owner' || role === 'manager';
-  return { edit, comment: edit, highlight: edit };
+  const comment = edit || role === 'member';
+  return { edit, comment, highlight: comment };
 }
 
-/** Roles that may send `update` frames at all (members are read-only). */
-export const canSendUpdates = (role: Role): boolean => role !== 'member';
+/** Roles that may send `update` frames at all. Members may — but only comment-scoped keys/marks
+ * (enforced by the server's commenter write-matrix); `none` (no access) may not. */
+export const canSendUpdates = (role: Role | 'none'): boolean =>
+  role === 'owner' || role === 'manager' || role === 'member';

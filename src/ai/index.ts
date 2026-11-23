@@ -9,17 +9,59 @@ import { z } from 'zod';
  * and objects are closed, so `z.toJSONSchema` gives the exact schema to store on the ShapeShyft endpoint.
  */
 
-export const AI_TASKS = ['coverage', 'polish.dialogue'] as const;
+export const AI_TASKS = [
+  'coverage',
+  'polish.dialogue',
+  'review',
+  'trim',
+] as const;
 export type AiTask = (typeof AI_TASKS)[number];
 export const aiTaskSchema = z.enum(AI_TASKS);
+
+/**
+ * Focused AI review modes. Each is its own ShapeShyft endpoint (`script-review-<kind>`) with its own
+ * tuned system prompt/model, selected by `reviewKind` on a `review` job. All share one output schema
+ * (`reviewResponseSchema`). `general` is broad coverage; the rest focus on one dimension.
+ */
+export const REVIEW_KINDS = [
+  'general',
+  'character',
+  'pacing',
+  'visual',
+  'continuity',
+  'loose-end',
+  'dialogue',
+  'structure',
+  'theme',
+  'tone',
+  'format',
+  'stakes',
+  // Specialist / persona reviews.
+  'studio-exec',
+  'first-ten',
+  'representation',
+  'cliche',
+  'accuracy',
+  'clearance',
+  'scene-purpose',
+  'subtext',
+] as const;
+export type ReviewKind = (typeof REVIEW_KINDS)[number];
+export const reviewKindSchema = z.enum(REVIEW_KINDS);
+/** The ShapeShyft endpoint name for a review kind. One endpoint per kind (user's explicit choice). */
+export const reviewEndpointName = (kind: ReviewKind) =>
+  `script-review-${kind}` as const;
+export type ScriptReviewEndpoint = `script-review-${ReviewKind}`;
 
 /** ShapeShyft endpoint names (spec 06 2.1). `summarize-chunk` is stage 1 of a long coverage run. */
 export const AI_ENDPOINTS = [
   'coverage-review',
   'polish',
   'summarize-chunk',
+  'trim',
 ] as const;
-export type AiEndpoint = (typeof AI_ENDPOINTS)[number];
+/** Every ShapeShyft endpoint: the fixed job/action endpoints plus one `script-review-<kind>` per review kind. */
+export type AiEndpoint = (typeof AI_ENDPOINTS)[number] | ScriptReviewEndpoint;
 
 export const AI_JOB_STATUSES = [
   'queued',
@@ -49,21 +91,35 @@ export const AI_LIMITS = {
   sceneSummaryMax: 280,
   polishMaxScenes: 8,
   instructionsMax: 500,
+  // Structured review comments: the concrete "suggestion" text and how many comments one review emits.
+  suggestionMax: 1200,
+  reviewCommentsMax: 40,
 } as const;
 
 export const REVIEW_CATEGORIES = [
   'premise',
   'structure',
   'character',
+  'motive',
   'dialogue',
   'pacing',
+  'visual',
   'tone',
   'theme',
+  'stakes',
+  'exposition',
   'worldbuilding',
   'format',
   'marketability',
   'clarity',
   'continuity',
+  'loose-end',
+  'representation',
+  'cliche',
+  'accuracy',
+  'legal',
+  'subtext',
+  'other',
 ] as const;
 export type ReviewCategory = (typeof REVIEW_CATEGORIES)[number];
 export const SEVERITIES = ['praise', 'minor', 'moderate', 'major'] as const;
@@ -83,7 +139,10 @@ export const noteSchema = z.object({
   category: z.enum(REVIEW_CATEGORIES),
   severity: z.enum(SEVERITIES),
   title: z.string().min(1).max(AI_LIMITS.noteTitleMax),
+  /** The comment: what/why the reviewer is flagging. */
   body: z.string().min(1).max(AI_LIMITS.noteBodyMax),
+  /** The concrete action the writer could take. Nullable (structured-output rule: never optional). */
+  suggestion: z.string().max(AI_LIMITS.suggestionMax).nullable(),
   anchors: z.array(anchorRefSchema).max(AI_LIMITS.noteAnchorsMax),
 });
 export type ModelNote = z.infer<typeof noteSchema>;
@@ -116,6 +175,19 @@ export const polishResponseSchema = z.object({
 });
 export type PolishResponse = z.infer<typeof polishResponseSchema>;
 
+/**
+ * `script-review-<kind>` output. A flat list of structured comments (type / comment / suggestion),
+ * each anchored. `summary`/`verdict` are populated mainly by the `general` kind; focused kinds may
+ * leave them null. Every field is required-or-nullable (structured-output rule).
+ */
+export const reviewResponseSchema = z.object({
+  summary: z.string().max(AI_LIMITS.summaryMax).nullable(),
+  verdict: z.enum(COVERAGE_VERDICTS).nullable(),
+  verdictRationale: z.string().max(AI_LIMITS.verdictRationaleMax).nullable(),
+  comments: z.array(noteSchema).max(AI_LIMITS.reviewCommentsMax),
+});
+export type ReviewResponse = z.infer<typeof reviewResponseSchema>;
+
 /** `summarize-chunk` output (stage 1 of a long-script coverage run). */
 export const chunkSummaryResponseSchema = z.object({
   scenes: z.array(
@@ -140,11 +212,22 @@ export const aiEndpointInputSchema = z.object({
 export type AiEndpointInput = z.infer<typeof aiEndpointInputSchema>;
 
 /** Endpoint -> output schema. `bun run ai:schemas` in screenwriter_api prints these as JSON Schema. */
-export const AI_ENDPOINT_OUTPUT_SCHEMAS = {
+export const AI_ENDPOINT_OUTPUT_SCHEMAS: Record<AiEndpoint, z.ZodType> = {
   'coverage-review': coverageResponseSchema,
   polish: polishResponseSchema,
   'summarize-chunk': chunkSummaryResponseSchema,
-} as const satisfies Record<AiEndpoint, z.ZodType>;
+  // Trim reuses the polish output shape (one shorter replacement per element).
+  trim: polishResponseSchema,
+  // One entry per review kind; all share the review output schema.
+  ...(Object.fromEntries(
+    REVIEW_KINDS.map((k) => [reviewEndpointName(k), reviewResponseSchema])
+  ) as unknown as Record<ScriptReviewEndpoint, z.ZodType>),
+};
+
+/** Output schema for any endpoint, including the per-kind `script-review-*` endpoints. */
+export function aiEndpointOutputSchema(endpoint: AiEndpoint): z.ZodType {
+  return AI_ENDPOINT_OUTPUT_SCHEMAS[endpoint] ?? reviewResponseSchema;
+}
 
 // ---- Stored / returned shapes ----
 
@@ -161,6 +244,8 @@ export interface AiNote {
   severity: Severity;
   title: string;
   body: string;
+  /** Concrete suggested action; null when the model proposed none. */
+  suggestion: string | null;
   anchors: Anchor[];
 }
 
@@ -220,10 +305,13 @@ export const aiJobOptionsSchema = z.object({
   instructions: z.string().max(AI_LIMITS.instructionsMax).optional(),
   intensity: z.enum(['light', 'medium', 'bold']).optional(),
   locale: z.string().min(2).max(20).optional(),
+  /** `review` task only: which `script-review-<kind>` endpoint to call. Defaults to `general`. */
+  reviewKind: reviewKindSchema.optional(),
 });
 export type AiJobOptions = z.infer<typeof aiJobOptionsSchema>;
 
-/** `POST /documents/:did/ai/jobs` body. `polish.dialogue` needs a scope; `coverage` defaults to the whole script. */
+/** `POST /documents/:did/ai/jobs` body. `polish.dialogue` needs a scope; `coverage` defaults to the whole
+ * script. `review` reads `options.reviewKind` (which `script-review-<kind>` endpoint to call; default general). */
 export const aiJobCreateSchema = z.object({
   task: aiTaskSchema,
   scope: aiScopeSchema.optional(),
@@ -256,6 +344,21 @@ export type AiJobResult =
       suggestionSetId: string | null;
       count: number;
       droppedItems: number;
+    }
+  /**
+   * A `review` job: its findings are written straight into the document as `pending` AI comments
+   * (notes). The result reports how many were created and their note ids, plus the optional
+   * review-level summary/verdict. `droppedItems` = model items discarded in validation.
+   */
+  | {
+      kind: 'review';
+      reviewKind: ReviewKind;
+      noteIds: string[];
+      count: number;
+      droppedItems: number;
+      summary: string | null;
+      verdict: (typeof COVERAGE_VERDICTS)[number] | null;
+      verdictRationale: string | null;
     };
 
 /** `GET /ai/jobs/:jobId` and the items of `GET /documents/:did/ai/jobs`. Poll until `status` is final. */

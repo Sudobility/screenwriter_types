@@ -74,6 +74,8 @@ export const PERMISSION_MIN_ROLE = {
   'document.export': 'member',
   'document.edit': 'manager',
   'document.comment': 'member',
+  // Triaging a comment (confirm → todo / complete / reject) is the writer's call: manager+ only.
+  'document.comment.triage': 'manager',
   'document.chat': 'member',
   'document.activity': 'member',
   'document.trash': 'manager',

@@ -20,6 +20,16 @@ export const AI_ACTIONS = [
   'smart-paste-plots',
   'smart-paste-script',
   'suggest-note-fix',
+  'logline-synopsis',
+  'tension-curve',
+  'script-breakdown',
+  'revision-diff',
+  'assistant',
+  'tone-pass',
+  'line-alternates',
+  'voice-profile',
+  'character-interview',
+  'agent-act',
 ] as const;
 export type AiAction = (typeof AI_ACTIONS)[number];
 export const aiActionSchema = z.enum(AI_ACTIONS);
@@ -71,7 +81,82 @@ export const AI_ACTION_LIMITS = {
   fixSuggestionsMax: 3,
   fixEditsMax: 12,
   fixSummaryMax: 300,
+  /** Logline / synopsis / treatment: the serialized script in, and the marketing-copy outputs. */
+  synopsisScriptMax: 120_000,
+  loglineOutMax: 320,
+  genreOutMax: 3,
+  synopsisOutMax: 3_000,
+  treatmentOutMax: 12_000,
+  /** Tension curve: per-scene dramatic-intensity scoring. */
+  tensionScenesMax: 160,
+  tensionSceneTextMax: 1_200,
+  tensionNoteMax: 160,
+  /** Script breakdown: production elements per scene. */
+  breakdownScenesMax: 160,
+  breakdownSceneTextMax: 2_000,
+  breakdownItemsMax: 40,
+  breakdownItemMax: 120,
+  /** Revision diff: two serialized script versions in, a story-level change summary out. */
+  revisionScriptMax: 120_000,
+  revisionSummaryMax: 2_000,
+  revisionChangesMax: 40,
+  revisionArcsMax: 20,
+  revisionTitleMax: 120,
+  revisionDetailMax: 600,
+  /** Document Q&A assistant: a question over the script, with conversation history. */
+  assistantQuestionMax: 1_000,
+  assistantScenesMax: 160,
+  assistantSceneTextMax: 1_500,
+  assistantHistoryMax: 12,
+  assistantHistoryTextMax: 2_000,
+  assistantAnswerMax: 4_000,
+  assistantRefsMax: 12,
+  assistantWhyMax: 200,
+  /** Tonal pass: shift a scene's tone. */
+  toneMax: 40,
+  /** Line alternates: how many rewrites of one line to offer. */
+  alternatesCountMax: 6,
+  /** Voice profile: how many of a character's lines to send, and the length of each profile field. */
+  voiceLinesMax: 120,
+  voiceNameMax: 120,
+  voiceFieldMax: 800,
+  /** Character interview: a chat role-played as a character, grounded in their lines and (optionally) their voice profile. */
+  interviewProfileMax: 2_000,
+  interviewAnswerMax: 2_000,
+  /** Agent "act": the AI proposes typed operations the writer confirms one by one. */
+  agentMessageMax: 1_000,
+  agentOpsMax: 20,
+  agentCommentBodyMax: 600,
+  agentCategoryMax: 40,
 } as const;
+
+/** What a story-level change between two versions did. */
+export const REVISION_CHANGE_KINDS = [
+  'added',
+  'cut',
+  'rewritten',
+  'moved',
+  'other',
+] as const;
+export type RevisionChangeKind = (typeof REVISION_CHANGE_KINDS)[number];
+
+/** AD breakdown categories (the "strips" of a breakdown sheet). */
+export const BREAKDOWN_CATEGORIES = [
+  'cast',
+  'extras',
+  'stunts',
+  'props',
+  'wardrobe',
+  'makeupHair',
+  'setDressing',
+  'vehicles',
+  'animals',
+  'sfx',
+  'vfx',
+  'sound',
+  'special',
+] as const;
+export type BreakdownCategory = (typeof BREAKDOWN_CATEGORIES)[number];
 
 // ---- Character skeleton (the shape `screenwriter_app`'s CharacterSkeletonEditor edits) ----
 
@@ -469,11 +554,13 @@ export const fixSceneElementSchema = z.strictObject({
 export type FixSceneElement = z.infer<typeof fixSceneElementSchema>;
 
 export const suggestNoteFixRequestSchema = z.strictObject({
-  /** The review note to act on, as the review gave it. */
+  /** The comment to act on, as the review/writer gave it. */
   note: z.strictObject({
     title: z.string().trim().min(1).max(AI_ACTION_LIMITS.noteTitleMax),
     body: z.string().trim().min(1).max(AI_ACTION_LIMITS.noteBodyMax),
     category: z.string().max(40).optional(),
+    /** The comment's concrete suggested action, when it has one; the AI should honor it. */
+    suggestion: z.string().trim().max(AI_ACTION_LIMITS.noteBodyMax).optional(),
   }),
   scene: z.strictObject({
     heading: z.string().max(AI_ACTION_LIMITS.headingTextMax).optional(),
@@ -515,6 +602,368 @@ export const suggestNoteFixModelSchema = z.strictObject({
 export const suggestNoteFixResultSchema = suggestNoteFixModelSchema;
 export type SuggestNoteFixResult = z.infer<typeof suggestNoteFixResultSchema>;
 
+// ---- 9. logline-synopsis (pitch material from the whole script) ----
+
+export const loglineSynopsisRequestSchema = z.strictObject({
+  /** The whole script, serialized to text by the caller (scene headings + lines). */
+  script: z.string().trim().min(1).max(AI_ACTION_LIMITS.synopsisScriptMax),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type LoglineSynopsisRequest = z.infer<
+  typeof loglineSynopsisRequestSchema
+>;
+
+export const loglineSynopsisModelSchema = z.strictObject({
+  /** One or two sentences: the hook. */
+  logline: z.string().max(AI_ACTION_LIMITS.loglineOutMax),
+  genre: z.array(z.string().max(40)).max(AI_ACTION_LIMITS.genreOutMax),
+  /** A tight paragraph or two (back-of-the-box). */
+  synopsis: z.string().max(AI_ACTION_LIMITS.synopsisOutMax),
+  /** A one-to-two-page present-tense treatment of the whole story, beginning to end (reveals the ending). */
+  treatment: z.string().max(AI_ACTION_LIMITS.treatmentOutMax),
+});
+export const loglineSynopsisResultSchema = loglineSynopsisModelSchema;
+export type LoglineSynopsisResult = z.infer<typeof loglineSynopsisResultSchema>;
+
+// ---- 10. tension-curve (per-scene dramatic intensity, for the tension graph) ----
+
+export const tensionCurveRequestSchema = z.strictObject({
+  scenes: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(AI_ACTION_LIMITS.idMax),
+        heading: z.string().max(AI_ACTION_LIMITS.headingTextMax),
+        text: z.string().max(AI_ACTION_LIMITS.tensionSceneTextMax),
+      })
+    )
+    .min(1)
+    .max(AI_ACTION_LIMITS.tensionScenesMax),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type TensionCurveRequest = z.infer<typeof tensionCurveRequestSchema>;
+
+export const tensionCurveModelSchema = z.strictObject({
+  scenes: z
+    .array(
+      z.strictObject({
+        sceneId: z.string(),
+        /** 1 = calm, 5 = peak dramatic intensity. */
+        intensity: z.number().int().min(1).max(5),
+        note: z.string().max(AI_ACTION_LIMITS.tensionNoteMax),
+      })
+    )
+    .max(AI_ACTION_LIMITS.tensionScenesMax),
+});
+export const tensionCurveResultSchema = tensionCurveModelSchema;
+export type TensionCurveResult = z.infer<typeof tensionCurveResultSchema>;
+
+// ---- 11. script-breakdown (AD production breakdown per scene) ----
+
+export const scriptBreakdownRequestSchema = z.strictObject({
+  scenes: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(AI_ACTION_LIMITS.idMax),
+        heading: z.string().max(AI_ACTION_LIMITS.headingTextMax),
+        text: z.string().max(AI_ACTION_LIMITS.breakdownSceneTextMax),
+      })
+    )
+    .min(1)
+    .max(AI_ACTION_LIMITS.breakdownScenesMax),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type ScriptBreakdownRequest = z.infer<
+  typeof scriptBreakdownRequestSchema
+>;
+
+export const scriptBreakdownModelSchema = z.strictObject({
+  scenes: z
+    .array(
+      z.strictObject({
+        sceneId: z.string(),
+        elements: z
+          .array(
+            z.strictObject({
+              category: z.enum(BREAKDOWN_CATEGORIES),
+              items: z
+                .array(z.string().max(AI_ACTION_LIMITS.breakdownItemMax))
+                .max(AI_ACTION_LIMITS.breakdownItemsMax),
+            })
+          )
+          .max(BREAKDOWN_CATEGORIES.length),
+      })
+    )
+    .max(AI_ACTION_LIMITS.breakdownScenesMax),
+});
+export const scriptBreakdownResultSchema = scriptBreakdownModelSchema;
+export type ScriptBreakdownResult = z.infer<typeof scriptBreakdownResultSchema>;
+
+// ---- 12. revision-diff (story-level change between two script versions) ----
+
+export const revisionDiffRequestSchema = z.strictObject({
+  /** The serialized earlier version (e.g. a snapshot). */
+  before: z.string().trim().min(1).max(AI_ACTION_LIMITS.revisionScriptMax),
+  /** The serialized later version (e.g. the current script). */
+  after: z.string().trim().min(1).max(AI_ACTION_LIMITS.revisionScriptMax),
+  beforeLabel: z.string().max(120).optional(),
+  afterLabel: z.string().max(120).optional(),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type RevisionDiffRequest = z.infer<typeof revisionDiffRequestSchema>;
+
+export const revisionDiffModelSchema = z.strictObject({
+  /** One paragraph: how the story changed overall. */
+  summary: z.string().max(AI_ACTION_LIMITS.revisionSummaryMax),
+  changes: z
+    .array(
+      z.strictObject({
+        kind: z.enum(REVISION_CHANGE_KINDS),
+        title: z.string().max(AI_ACTION_LIMITS.revisionTitleMax),
+        detail: z.string().max(AI_ACTION_LIMITS.revisionDetailMax),
+      })
+    )
+    .max(AI_ACTION_LIMITS.revisionChangesMax),
+  /** How a character's or thread's arc drifted between the versions. */
+  arcs: z
+    .array(
+      z.strictObject({
+        subject: z.string().max(AI_ACTION_LIMITS.revisionTitleMax),
+        change: z.string().max(AI_ACTION_LIMITS.revisionDetailMax),
+      })
+    )
+    .max(AI_ACTION_LIMITS.revisionArcsMax),
+});
+export const revisionDiffResultSchema = revisionDiffModelSchema;
+export type RevisionDiffResult = z.infer<typeof revisionDiffResultSchema>;
+
+// ---- 13. assistant (read-only document Q&A, grounded in the script) ----
+
+export const ASSISTANT_ROLES = ['user', 'assistant'] as const;
+export type AssistantRole = (typeof ASSISTANT_ROLES)[number];
+
+export const assistantRequestSchema = z.strictObject({
+  question: z.string().trim().min(1).max(AI_ACTION_LIMITS.assistantQuestionMax),
+  scenes: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(AI_ACTION_LIMITS.idMax),
+        heading: z.string().max(AI_ACTION_LIMITS.headingTextMax),
+        text: z.string().max(AI_ACTION_LIMITS.assistantSceneTextMax),
+      })
+    )
+    .min(1)
+    .max(AI_ACTION_LIMITS.assistantScenesMax),
+  /** Earlier turns, oldest first, for follow-up questions. */
+  history: z
+    .array(
+      z.strictObject({
+        role: z.enum(ASSISTANT_ROLES),
+        text: z.string().max(AI_ACTION_LIMITS.assistantHistoryTextMax),
+      })
+    )
+    .max(AI_ACTION_LIMITS.assistantHistoryMax)
+    .optional(),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type AssistantRequest = z.infer<typeof assistantRequestSchema>;
+
+export const assistantModelSchema = z.strictObject({
+  answer: z.string().max(AI_ACTION_LIMITS.assistantAnswerMax),
+  /** Scenes the answer draws on, so the UI can offer jump links. */
+  references: z
+    .array(
+      z.strictObject({
+        sceneId: z.string(),
+        why: z.string().max(AI_ACTION_LIMITS.assistantWhyMax),
+      })
+    )
+    .max(AI_ACTION_LIMITS.assistantRefsMax),
+});
+export const assistantResultSchema = assistantModelSchema;
+export type AssistantResult = z.infer<typeof assistantResultSchema>;
+
+// ---- 14. tone-pass (rewrite a scene to shift its tone; reuses the note-fix scene/edit shapes) ----
+
+export const tonePassRequestSchema = z.strictObject({
+  scene: z.strictObject({
+    heading: z.string().max(AI_ACTION_LIMITS.headingTextMax).optional(),
+    elements: z
+      .array(fixSceneElementSchema)
+      .min(1)
+      .max(AI_ACTION_LIMITS.sceneElementsMax),
+  }),
+  /** The target tone, e.g. "darker", "funnier", "more tense". */
+  tone: z.string().trim().min(1).max(AI_ACTION_LIMITS.toneMax),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type TonePassRequest = z.infer<typeof tonePassRequestSchema>;
+
+export const tonePassModelSchema = z.strictObject({
+  summary: z.string().min(1).max(AI_ACTION_LIMITS.fixSummaryMax),
+  edits: z.array(noteFixEditSchema).max(AI_ACTION_LIMITS.sceneElementsMax),
+});
+export const tonePassResultSchema = tonePassModelSchema;
+export type TonePassResult = z.infer<typeof tonePassResultSchema>;
+
+// ---- 15. line-alternates (several rewrites of one line; the writer picks one, the app replaces the line) ----
+
+export const lineAlternatesRequestSchema = z.strictObject({
+  scene: z.strictObject({
+    heading: z.string().max(AI_ACTION_LIMITS.headingTextMax).optional(),
+    elements: z
+      .array(fixSceneElementSchema)
+      .min(1)
+      .max(AI_ACTION_LIMITS.sceneElementsMax),
+  }),
+  /** The element to offer alternates for; must be one of `scene.elements`. */
+  targetId: z.string().min(1).max(64),
+  count: z
+    .number()
+    .int()
+    .min(1)
+    .max(AI_ACTION_LIMITS.alternatesCountMax)
+    .optional(),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type LineAlternatesRequest = z.infer<typeof lineAlternatesRequestSchema>;
+
+export const lineAlternatesModelSchema = z.strictObject({
+  alternates: z
+    .array(z.string().min(1).max(AI_ACTION_LIMITS.sceneElementTextMax))
+    .min(1)
+    .max(AI_ACTION_LIMITS.alternatesCountMax),
+});
+export const lineAlternatesResultSchema = lineAlternatesModelSchema;
+export type LineAlternatesResult = z.infer<typeof lineAlternatesResultSchema>;
+
+// ---- 16. voice-profile (describe how a character speaks, from their own lines) ----
+
+export const voiceProfileRequestSchema = z.strictObject({
+  name: z.string().trim().min(1).max(AI_ACTION_LIMITS.voiceNameMax),
+  /** The character's own dialogue lines, harvested from the script. */
+  lines: z
+    .array(z.string().min(1).max(AI_ACTION_LIMITS.sceneElementTextMax))
+    .min(1)
+    .max(AI_ACTION_LIMITS.voiceLinesMax),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type VoiceProfileRequest = z.infer<typeof voiceProfileRequestSchema>;
+
+export const voiceProfileModelSchema = z.strictObject({
+  summary: z.string().min(1).max(AI_ACTION_LIMITS.voiceFieldMax),
+  vocabulary: z.string().max(AI_ACTION_LIMITS.voiceFieldMax),
+  rhythm: z.string().max(AI_ACTION_LIMITS.voiceFieldMax),
+  tics: z.string().max(AI_ACTION_LIMITS.voiceFieldMax),
+  sample: z.string().max(AI_ACTION_LIMITS.voiceFieldMax),
+});
+export const voiceProfileResultSchema = voiceProfileModelSchema;
+export type VoiceProfileResult = z.infer<typeof voiceProfileResultSchema>;
+/** Stored on the character entity (attributes.voiceProfile) and shown in the sidebar. */
+export type VoiceProfile = VoiceProfileResult;
+
+// ---- 17. character-interview (chat role-played as a character, grounded in their lines) ----
+
+export const characterInterviewRequestSchema = z.strictObject({
+  name: z.string().trim().min(1).max(AI_ACTION_LIMITS.voiceNameMax),
+  question: z.string().trim().min(1).max(AI_ACTION_LIMITS.assistantQuestionMax),
+  /** The character's own dialogue, so the reply stays in their voice. */
+  lines: z
+    .array(z.string().min(1).max(AI_ACTION_LIMITS.sceneElementTextMax))
+    .max(AI_ACTION_LIMITS.voiceLinesMax),
+  /** Optional pre-computed voice profile (any flattened description), to steer the voice. */
+  profile: z.string().max(AI_ACTION_LIMITS.interviewProfileMax).optional(),
+  history: z
+    .array(
+      z.strictObject({
+        role: z.enum(ASSISTANT_ROLES),
+        text: z.string().max(AI_ACTION_LIMITS.assistantHistoryTextMax),
+      })
+    )
+    .max(AI_ACTION_LIMITS.assistantHistoryMax)
+    .optional(),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type CharacterInterviewRequest = z.infer<
+  typeof characterInterviewRequestSchema
+>;
+
+export const characterInterviewModelSchema = z.strictObject({
+  answer: z.string().min(1).max(AI_ACTION_LIMITS.interviewAnswerMax),
+});
+export const characterInterviewResultSchema = characterInterviewModelSchema;
+export type CharacterInterviewResult = z.infer<
+  typeof characterInterviewResultSchema
+>;
+
+// ---- 18. agent-act (the AI proposes typed, confirm-before-apply operations from a fixed vocabulary) ----
+
+export const AGENT_OP_KINDS = ['comment', 'rename-character'] as const;
+
+/**
+ * A proposed operation. The AI only PROPOSES these; the app applies each one as an undoable document command
+ * after the writer confirms it — nothing is applied automatically.
+ */
+export const agentOperationSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('comment'),
+    sceneId: z.string().min(1).max(64),
+    category: z.string().trim().min(1).max(AI_ACTION_LIMITS.agentCategoryMax),
+    body: z.string().trim().min(1).max(AI_ACTION_LIMITS.agentCommentBodyMax),
+    suggestion: z
+      .string()
+      .trim()
+      .max(AI_ACTION_LIMITS.agentCommentBodyMax)
+      .optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('rename-character'),
+    from: z.string().trim().min(1).max(AI_ACTION_LIMITS.voiceNameMax),
+    to: z.string().trim().min(1).max(AI_ACTION_LIMITS.voiceNameMax),
+  }),
+]);
+export type AgentOperation = z.infer<typeof agentOperationSchema>;
+
+export const agentActRequestSchema = z.strictObject({
+  instruction: z
+    .string()
+    .trim()
+    .min(1)
+    .max(AI_ACTION_LIMITS.assistantQuestionMax),
+  scenes: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(64),
+        heading: z.string().max(AI_ACTION_LIMITS.headingTextMax),
+        text: z.string().max(AI_ACTION_LIMITS.assistantSceneTextMax),
+      })
+    )
+    .min(1)
+    .max(AI_ACTION_LIMITS.assistantScenesMax),
+  /** Known character names, so a rename targets a real one. */
+  characters: z
+    .array(z.string().min(1).max(AI_ACTION_LIMITS.voiceNameMax))
+    .max(500)
+    .optional(),
+  history: z
+    .array(
+      z.strictObject({
+        role: z.enum(ASSISTANT_ROLES),
+        text: z.string().max(AI_ACTION_LIMITS.assistantHistoryTextMax),
+      })
+    )
+    .max(AI_ACTION_LIMITS.assistantHistoryMax)
+    .optional(),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type AgentActRequest = z.infer<typeof agentActRequestSchema>;
+
+export const agentActModelSchema = z.strictObject({
+  message: z.string().max(AI_ACTION_LIMITS.agentMessageMax),
+  operations: z.array(agentOperationSchema).max(AI_ACTION_LIMITS.agentOpsMax),
+});
+export const agentActResultSchema = agentActModelSchema;
+export type AgentActResult = z.infer<typeof agentActResultSchema>;
+
 // ---- Registry ----
 
 /** Action -> schema of what the model returns (stored on the ShapeShyft endpoint). */
@@ -527,6 +976,16 @@ export const AI_ACTION_MODEL_SCHEMAS = {
   'smart-paste-plots': smartPastePlotsModelSchema,
   'smart-paste-script': smartPasteScriptModelSchema,
   'suggest-note-fix': suggestNoteFixModelSchema,
+  'logline-synopsis': loglineSynopsisModelSchema,
+  'tension-curve': tensionCurveModelSchema,
+  'script-breakdown': scriptBreakdownModelSchema,
+  'revision-diff': revisionDiffModelSchema,
+  assistant: assistantModelSchema,
+  'tone-pass': tonePassModelSchema,
+  'line-alternates': lineAlternatesModelSchema,
+  'voice-profile': voiceProfileModelSchema,
+  'character-interview': characterInterviewModelSchema,
+  'agent-act': agentActModelSchema,
 } as const satisfies Record<AiAction, z.ZodType>;
 
 /** Action -> schema of the request body the client sends. */
@@ -539,6 +998,16 @@ export const AI_ACTION_REQUEST_SCHEMAS = {
   'smart-paste-plots': smartPastePlotsRequestSchema,
   'smart-paste-script': smartPasteScriptRequestSchema,
   'suggest-note-fix': suggestNoteFixRequestSchema,
+  'logline-synopsis': loglineSynopsisRequestSchema,
+  'tension-curve': tensionCurveRequestSchema,
+  'script-breakdown': scriptBreakdownRequestSchema,
+  'revision-diff': revisionDiffRequestSchema,
+  assistant: assistantRequestSchema,
+  'tone-pass': tonePassRequestSchema,
+  'line-alternates': lineAlternatesRequestSchema,
+  'voice-profile': voiceProfileRequestSchema,
+  'character-interview': characterInterviewRequestSchema,
+  'agent-act': agentActRequestSchema,
 } as const satisfies Record<AiAction, z.ZodType>;
 
 /** What `POST /ai/{action}` returns in `data`: the normalised result plus what the call cost. */

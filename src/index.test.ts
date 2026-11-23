@@ -607,12 +607,17 @@ describe('B8 routes and schemas', () => {
       comment: true,
       highlight: true,
     });
+    // Members are comment-only on the live document: they may add notes/comment marks but not edit.
     expect(markPermissionsFor('member')).toEqual({
+      edit: false,
+      comment: true,
+      highlight: true,
+    });
+    expect(markPermissionsFor('none')).toEqual({
       edit: false,
       comment: false,
       highlight: false,
     });
-    expect(markPermissionsFor('none').edit).toBe(false);
     expect(COMMENTER_WRITABLE_KEYS).toEqual(['notes']);
     expect(isCommenterMark('n:note_1')).toBe(true);
     expect(isCommenterMark('hl')).toBe(true);

@@ -232,6 +232,17 @@ export const API_ROUTES = {
   aiSmartPasteScript: r('POST', '/ai/smart-paste-script', 'U'),
   // A review note + the scene it is about -> alternative fixes, each a set of element edits the client applies.
   aiSuggestNoteFix: r('POST', '/ai/suggest-note-fix', 'U'),
+  // Pitch material (logline/genre/synopsis/treatment) and the per-scene tension curve, both from the whole script.
+  aiLoglineSynopsis: r('POST', '/ai/logline-synopsis', 'U'),
+  aiTensionCurve: r('POST', '/ai/tension-curve', 'U'),
+  aiScriptBreakdown: r('POST', '/ai/script-breakdown', 'U'),
+  aiRevisionDiff: r('POST', '/ai/revision-diff', 'U'),
+  aiAssistant: r('POST', '/ai/assistant', 'U'),
+  aiTonePass: r('POST', '/ai/tone-pass', 'U'),
+  aiLineAlternates: r('POST', '/ai/line-alternates', 'U'),
+  aiVoiceProfile: r('POST', '/ai/voice-profile', 'U'),
+  aiCharacterInterview: r('POST', '/ai/character-interview', 'U'),
+  aiAgentAct: r('POST', '/ai/agent-act', 'U'),
   aiJobCreate: r('POST', '/documents/:did/ai/jobs', 'U,Krw', 'ai.run'),
   aiJobsList: r('GET', '/documents/:did/ai/jobs', 'U,Kr', 'document.read'),
   aiSceneSummaries: r(
