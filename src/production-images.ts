@@ -29,3 +29,21 @@ export interface ProductionImageRecord {
 export interface GeneratedImageCount {
   count: number;
 }
+
+/** The fixed, project-independent style id stamped on line-art storyboard frames. */
+export const STORYBOARD_STYLE_ID = 'line-art';
+
+/**
+ * One scene's AI-generated storyboard, stored on the hidden Story entity's `fields.sceneStoryboards`
+ * keyed by scene id. The PNG bytes live in object storage; `images` holds only the metadata records.
+ */
+export interface SceneStoryboard {
+  /** Short title describing the scene (shown in the Storyboards list). */
+  shortTitle: string;
+  /** Fuller prose description of what happens in the scene. */
+  detailedDescription: string;
+  /** The optional writer instructions this storyboard was generated with. */
+  instructions?: string;
+  /** One line-art frame per shot. */
+  images: ProductionImageRecord[];
+}

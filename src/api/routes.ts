@@ -243,6 +243,7 @@ export const API_ROUTES = {
   aiVoiceProfile: r('POST', '/ai/voice-profile', 'U'),
   aiCharacterInterview: r('POST', '/ai/character-interview', 'U'),
   aiAgentAct: r('POST', '/ai/agent-act', 'U'),
+  aiStoryboardFromScene: r('POST', '/ai/storyboard-from-scene', 'U'),
   aiJobCreate: r('POST', '/documents/:did/ai/jobs', 'U,Krw', 'ai.run'),
   aiJobsList: r('GET', '/documents/:did/ai/jobs', 'U,Kr', 'document.read'),
   aiSceneSummaries: r(

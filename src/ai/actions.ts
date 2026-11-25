@@ -30,6 +30,7 @@ export const AI_ACTIONS = [
   'voice-profile',
   'character-interview',
   'agent-act',
+  'storyboard-from-scene',
 ] as const;
 export type AiAction = (typeof AI_ACTIONS)[number];
 export const aiActionSchema = z.enum(AI_ACTIONS);
@@ -57,6 +58,8 @@ export const AI_ACTION_LIMITS = {
   locationMax: 120,
   timeMax: 40,
   idMax: 64,
+  /** Storyboard: how many line-art frames one scene's storyboard may hold. */
+  storyboardShotsMax: 8,
   /**
    * Smart Paste: text taken from the clipboard. Counted in words (what the writer sees and what is priced) and in
    * characters (a hard ceiling for the request body). The script limit is lower because its output is as long as
@@ -964,6 +967,62 @@ export const agentActModelSchema = z.strictObject({
 export const agentActResultSchema = agentActModelSchema;
 export type AgentActResult = z.infer<typeof agentActResultSchema>;
 
+// ---- N. storyboard-from-scene (a line-art storyboard for one scene) ----
+
+export const storyboardFromSceneRequestSchema = z.strictObject({
+  scene: z.strictObject({
+    /** The scene heading as text, e.g. "INT. LAB - DAY". Context only. */
+    heading: z
+      .string()
+      .max(AI_ACTION_LIMITS.locationMax + AI_ACTION_LIMITS.timeMax + 16)
+      .optional(),
+    elements: z
+      .array(scriptElementSchema)
+      .min(1)
+      .max(AI_ACTION_LIMITS.sceneElementsMax),
+  }),
+  /** Optional free-form steer from the writer (camera notes, mood, what to emphasise…). */
+  instructions: z
+    .string()
+    .trim()
+    .max(AI_ACTION_LIMITS.descriptionMax)
+    .optional(),
+  language: z.string().max(AI_ACTION_LIMITS.languageMax).optional(),
+});
+export type StoryboardFromSceneRequest = z.infer<
+  typeof storyboardFromSceneRequestSchema
+>;
+
+export const storyboardShotSchema = z.strictObject({
+  /** A single line-art frame: what it depicts — blocking, subjects, camera composition, environment. */
+  description: z
+    .string()
+    .trim()
+    .min(3)
+    .max(AI_ACTION_LIMITS.sceneElementTextMax),
+});
+export type StoryboardShot = z.infer<typeof storyboardShotSchema>;
+
+export const storyboardFromSceneModelSchema = z.strictObject({
+  /** A short title describing the scene, for the storyboard list. */
+  shortTitle: z.string().trim().min(1).max(AI_ACTION_LIMITS.titleMax),
+  /** A fuller prose description of what happens in the scene. */
+  detailedDescription: z
+    .string()
+    .trim()
+    .min(1)
+    .max(AI_ACTION_LIMITS.descriptionMax),
+  /** One entry per line-art frame (1..N). */
+  shots: z
+    .array(storyboardShotSchema)
+    .min(1)
+    .max(AI_ACTION_LIMITS.storyboardShotsMax),
+});
+export const storyboardFromSceneResultSchema = storyboardFromSceneModelSchema;
+export type StoryboardFromSceneResult = z.infer<
+  typeof storyboardFromSceneResultSchema
+>;
+
 // ---- Registry ----
 
 /** Action -> schema of what the model returns (stored on the ShapeShyft endpoint). */
@@ -986,6 +1045,7 @@ export const AI_ACTION_MODEL_SCHEMAS = {
   'voice-profile': voiceProfileModelSchema,
   'character-interview': characterInterviewModelSchema,
   'agent-act': agentActModelSchema,
+  'storyboard-from-scene': storyboardFromSceneModelSchema,
 } as const satisfies Record<AiAction, z.ZodType>;
 
 /** Action -> schema of the request body the client sends. */
@@ -1008,6 +1068,7 @@ export const AI_ACTION_REQUEST_SCHEMAS = {
   'voice-profile': voiceProfileRequestSchema,
   'character-interview': characterInterviewRequestSchema,
   'agent-act': agentActRequestSchema,
+  'storyboard-from-scene': storyboardFromSceneRequestSchema,
 } as const satisfies Record<AiAction, z.ZodType>;
 
 /** What `POST /ai/{action}` returns in `data`: the normalised result plus what the call cost. */

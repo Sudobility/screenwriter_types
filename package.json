@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/screenwriter_types",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "Shared TypeScript types and Zod schemas for the ViaInk frontend and backend",
   "type": "module",
   "main": "./dist/index.js",
