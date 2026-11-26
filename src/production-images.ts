@@ -10,6 +10,11 @@ export const productionImageKindSchema = z.enum([
 export type ProductionImageKind = z.infer<typeof productionImageKindSchema>;
 export const productionImageRequestSchema = z.object({
   description: z.string().trim().min(3).max(2000),
+  /**
+   * Optional surrounding context for the image (not stored on the record): e.g. a storyboard frame passes the whole
+   * numbered scene so the model draws one consistent moment of it. Kept generous; it is prompt context, not a caption.
+   */
+  context: z.string().trim().max(8000).optional(),
 });
 export type ProductionImageRequest = z.infer<
   typeof productionImageRequestSchema

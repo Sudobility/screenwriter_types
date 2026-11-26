@@ -1000,6 +1000,14 @@ export const storyboardShotSchema = z.strictObject({
     .trim()
     .min(3)
     .max(AI_ACTION_LIMITS.sceneElementTextMax),
+  /**
+   * The 1-based numbers of the scene's script lines this frame depicts (from the numbered scene the model is given).
+   * Lets image generation reference the exact moment. Empty when the frame covers the whole scene / no specific line.
+   */
+  lines: z
+    .array(z.number().int().min(1).max(AI_ACTION_LIMITS.sceneElementsMax))
+    .max(AI_ACTION_LIMITS.sceneElementsMax)
+    .optional(),
 });
 export type StoryboardShot = z.infer<typeof storyboardShotSchema>;
 
