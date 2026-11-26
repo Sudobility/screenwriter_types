@@ -1008,6 +1008,17 @@ export const storyboardShotSchema = z.strictObject({
     .array(z.number().int().min(1).max(AI_ACTION_LIMITS.sceneElementsMax))
     .max(AI_ACTION_LIMITS.sceneElementsMax)
     .optional(),
+  /**
+   * When this frame shares the same camera framing/setup as an EARLIER frame, the 1-based number of that earlier
+   * frame in this shot list: its generated image is then used as a visual reference so the two stay consistent.
+   * Must be strictly earlier than this frame; absent for a frame with a new setup.
+   */
+  referenceShot: z
+    .number()
+    .int()
+    .min(1)
+    .max(AI_ACTION_LIMITS.storyboardShotsMax)
+    .optional(),
 });
 export type StoryboardShot = z.infer<typeof storyboardShotSchema>;
 

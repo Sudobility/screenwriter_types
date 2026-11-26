@@ -15,6 +15,11 @@ export const productionImageRequestSchema = z.object({
    * numbered scene so the model draws one consistent moment of it. Kept generous; it is prompt context, not a caption.
    */
   context: z.string().trim().max(8000).optional(),
+  /**
+   * Optional `data:image/png;base64,…` of an earlier image with the same framing, used as a visual reference so this
+   * one stays consistent with it (e.g. a storyboard frame that reuses a previous frame's setup). Validated as a PNG.
+   */
+  referenceImage: z.string().max(25_000_000).optional(),
 });
 export type ProductionImageRequest = z.infer<
   typeof productionImageRequestSchema
